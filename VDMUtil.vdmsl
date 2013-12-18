@@ -1,0 +1,362 @@
+module JSONUtil
+imports from VDMUtil 
+    functions
+        seq_of_char2val[@type]:seq1 of char -> bool * [@type];
+        val2seq_of_char[@T] : @T +> seq of char;
+exports
+    types JSON; STRING; ARRAY; OBJECT; NUMBER; BOOL;
+    functions
+        parseJSON : JSON -> bool * VALUE;
+        strictParseJSON : JSON -> bool * VALUE;
+        printJSON : VALUE -> JSON;
+definitions
+
+types
+JSON = seq of char;
+STRING = seq of char;
+ARRAY = seq of VALUE;
+OBJECT = map STRING to VALUE;
+NUMBER = real;
+BOOL = bool;
+VALUE = [ STRING | ARRAY | OBJECT | NUMBER | BOOL ];
+
+values
+DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+NULL = "null";
+TRUE = "true";
+FALSE = "false";
+
+functions
+parseJSON : JSON -> bool * VALUE
+parseJSON(json) == cases parseValue(json):
+    mk_(value, rest) -> mk_(true, value),
+    others -> mk_(false, nil)
+    end;
+
+strictParseJSON : JSON -> bool * VALUE
+strictParseJSON(json) == cases parseValue(json):
+    mk_(value, rest) -> if trimBlanks(rest) = [] then mk_(true, value) else mk_(false, nil),
+    others -> mk_(false, nil)
+    end;
+
+    printJSON : VALUE -> JSON
+    printJSON(value) == printValue(value);
+
+/***
+printer for each type
+***/
+printValue : VALUE -> JSON
+printValue(value) ==
+    if value = true then
+        TRUE
+    elseif value = false then
+        FALSE
+    elseif value = nil then
+        NULL
+    elseif is_(value, NUMBER) then
+        printNumber(value)
+    elseif is_(value, STRING) then
+        printString(value)
+    elseif is_(value, ARRAY) then
+        printArray(value)
+    elseif is_(value, OBJECT) then
+        printObject(value)
+    else
+        "*** UNKNOWN ***";
+
+printNumber : NUMBER -> JSON
+printNumber(number) == VDMUtil`val2seq_of_char[real](number);
+
+printString : STRING -> JSON
+printString(string) == VDMUtil`val2seq_of_char[seq of char](string);
+
+printBool : BOOL -> JSON
+printBool(boolean) == if boolean then TRUE else FALSE;
+
+printArray : ARRAY -> JSON
+printArray(array) == cases array:
+    [head] ^ tail -> "[" ^ printValue(head) ^ printArray0(tail) ^ "]",
+    others -> "[]"
+    end;
+
+printArray0 : ARRAY -> JSON
+printArray0(array) == cases array:
+    [head] ^ tail -> ", " ^ printValue(head) ^ printArray0(tail),
+    others -> []
+    end;
+
+printObject : OBJECT -> JSON
+printObject(object) == printObject0( {mk_(key, object(key)) | key in set dom object});
+
+printObject0 : set of (STRING * VALUE) -> JSON
+printObject0(object) == cases object:
+    {mk_(key, value)} union tail -> "{" ^ printString(key) ^ ":"^ printValue(value)^printObject1(tail) ^ "}",
+    others -> "{}"
+    end;
+
+printObject1 : set of (STRING * VALUE) -> JSON
+printObject1(object) == cases object:
+   {mk_(key, value)} union tail -> ", " ^ printString(key)^":"^printValue(value) ^ printObject1(tail),
+    others -> []
+    end;
+
+/***
+parser for each type
+***/
+
+parseValue : JSON -> [VALUE * JSON]
+parseValue(json) == cases trimBlanks(json):
+    [] -> mk_(nil, json),
+    json0 ->
+        if hd json0 in set DIGITS or hd json0 in set {'-', '+'} then
+            parseNumber(json0)
+        elseif hd json0 = '\x22' then
+            parseString(json0)
+        elseif hd json0 = '{' then
+            parseObject(json0)
+        elseif hd json0 = '[' then
+            parseArray(json0)
+        elseif headmatch(json0, TRUE) then
+            mk_(true, [json0(i) | i in set {5,...,len json0}])
+        elseif headmatch(json0, FALSE) then
+            mk_(false, [json0(i) | i in set {6,...,len json0}])
+        elseif headmatch(json0, NULL) then
+            mk_(nil, [json0(i) | i in set {5,...,len json0}])
+        else nil
+    end
+measure measureJSON;
+
+parseObject : JSON -> [OBJECT * JSON]
+parseObject(json) ==
+    if json = [] or hd json <> '{' then 
+        nil
+    else 
+        let rest = trimBlanks(tl json) in 
+            if rest <> [] and hd rest = '}' then 
+                mk_({ |-> }, tl rest) 
+            else 
+                parseObject0(rest)
+measure measureJSON;
+
+parseObject0 : JSON -> [OBJECT * JSON]
+parseObject0(json) == cases parseString(json):
+    nil -> nil,
+    mk_(key, r) -> let json1 = trimBlanks(r) in
+        if json1 = [] or hd json1 <> ':' then
+            nil
+        else
+            cases parseValue(tl json1):
+                nil -> nil,
+                mk_(value, json2) -> let json3 = trimBlanks(json2) in
+                    if json3 = [] then
+                        nil
+                    elseif hd json3 = '}' then
+                        mk_({key |-> value}, tl json3)
+                    elseif hd json3 = ',' then
+                        cases parseObject0(trimBlanks(tl json3)):
+                            nil -> nil,
+                            mk_(object, rest1) -> mk_(object++{key |-> value}, rest1)
+                            end
+                    else
+                            nil
+                end
+    end
+measure measureJSON;
+
+parseArray : JSON -> [ARRAY * JSON]
+parseArray(json) ==
+    if json = [] or hd json <> '[' then 
+        nil
+    else 
+        let rest = trimBlanks(tl json) in 
+            if rest <> [] and hd rest = ']' then 
+                mk_([], tl rest) 
+            else 
+                parseArray0(tl json)
+measure measureJSON;
+
+parseArray0 : JSON -> [ARRAY * JSON]
+parseArray0(json) == cases parseValue(json):
+    nil -> nil,
+    mk_(value, r) -> let rest = trimBlanks(r) in
+        if rest = [] then
+            nil
+        elseif hd rest = ']' then
+            mk_([value], tl rest)
+        elseif hd rest = ',' then
+            cases parseArray0(tl rest):
+                nil -> nil,
+                mk_(array1, rest1) -> mk_([value]^array1, rest1)
+                end
+        else
+           nil
+    end
+measure measureJSON;
+
+parseString : JSON -> [STRING * JSON]
+parseString(json) ==
+    if json = [] or hd json <> '\x22' then
+        nil
+    else
+        parseString0(tl json);
+
+parseString0 : JSON -> [STRING * JSON]
+parseString0(json) == cases json:
+    [] -> nil,
+    ['\x22'] ^ rest -> mk_([], rest),
+    ['\\', '\x22'] ^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\x22'] ^ s, r)
+        end,
+    ['\\', '\\'] ^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\\']^s, r)
+        end,
+    ['\\', '/']^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['/']^s, r)
+        end,
+    ['\\', 'b']^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\x08']^s, r)
+        end,
+    ['\\', 'f']^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\f']^s, r)
+        end,
+    ['\\', 'n']^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\n']^s, r)
+        end,
+    ['\\', 'r']^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\r']^s, r)
+        end,
+    ['\\', 't']^rest ->cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\t']^s, r)
+        end,
+    ['\\', 'f']^rest ->cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_(['\f']^s, r)
+        end,
+    ['\\', 'u']^[u1]^[u2]^[u3]^[u4]^rest ->
+        cases string2char(['\'', '\\', 'u', u1, u2, u3, u4, '\'']):
+            nil -> nil,
+            c -> cases parseString0(rest):
+                nil -> nil,
+                mk_(s, r) -> mk_([c]^s, r)
+                end
+            end,
+    ['\\']^rest -> nil,
+    [c]^rest -> cases parseString0(rest):
+        nil -> nil,
+        mk_(s, r) -> mk_([c]^s, r)
+        end
+    end
+measure measureJSON;
+
+parseNumber : JSON -> [NUMBER * JSON]
+parseNumber(json) == cases parseReal(json):
+    nil -> nil,
+    mk_(string, rest) -> cases string2real(string):
+        nil -> nil,
+        c -> mk_(c, rest)
+        end
+    end;
+
+parseReal: JSON -> [JSON * JSON]
+parseReal(json) == cases parseInt(json):
+    nil -> nil,
+    mk_(i, rest) ->
+        if rest = [] then
+            mk_(i, rest)
+        elseif hd rest = '.' then
+            cases parseDecimal(tl rest):
+                nil -> nil,
+                mk_(d, rest2) -> mk_(i^"."^d, rest2)
+                end
+        elseif hd rest in set {'e', 'E'} then
+            cases parseInt(tl rest):
+                nil -> nil,
+                mk_(e, rest2) -> mk_(i^[hd rest]^e, rest2)
+                end
+        else
+            mk_(i, rest)
+    end;
+
+parseDecimal : JSON -> [JSON * JSON]
+parseDecimal(json) == cases parseNat(json):
+    nil -> nil,
+    mk_(n, rest) ->
+        if rest = [] then
+            mk_(n, rest)
+        elseif hd rest in set {'e', 'E'} then
+            cases parseInt(tl rest):
+                nil -> nil,
+                mk_(e, rest2) -> mk_(n^[hd rest]^e, rest2)
+                end
+        else
+            mk_(n, rest)
+    end;
+
+parseInt : JSON -> [JSON * JSON]
+parseInt(json) == 
+    if json = [] then
+        nil
+    elseif hd json in set {'-', '+'} then
+        cases parseNat(tl json):
+            nil -> nil,
+            mk_(i, rest) -> mk_([hd json]^i, rest)
+            end
+    else parseNat(json);
+
+parseNat: JSON -> [JSON * JSON]
+parseNat(json) == cases json:
+    [] -> nil,
+    ['0']^rest -> mk_("0", rest),
+    others -> if hd json in set DIGITS then parseNat0(json) else nil
+    end;
+
+parseNat0 : JSON -> JSON * JSON
+parseNat0(json) == cases json:
+    [] -> mk_([], json),
+    [c]^rest -> if c in set DIGITS then let mk_(n, r) = parseNat0(rest) in mk_([c]^n, r) else mk_([], json)
+    end
+measure measureJSON;
+
+/***
+utilities
+***/
+
+headmatch : JSON * JSON -> bool
+headmatch(json, pattern) == len json >= len pattern and [json(i) | i in set inds pattern] = pattern;
+
+trimBlanks : JSON -> JSON
+trimBlanks(json) == if json = [] or hd json not in set {' ', '\t', '\n', '\r'} then json else trimBlanks(tl json)
+measure measureJSON;
+
+string2char : seq of char -> [char]
+string2char(string) == let mk_(-,c)=VDMUtil`seq_of_char2val[char](string) in c;
+
+string2real : seq of char -> [real]
+string2real(string) == let mk_(-,c)=VDMUtil`seq_of_char2val[real](string) in c;
+
+measureJSON : JSON -> nat
+measureJSON(json) == len json;
+
+measureARRAY : ARRAY -> nat
+measureARRAY(array) == len array;
+
+end JSONUtil
+
+module VDMUtil
+exports all
+definitions
+functions
+seq_of_char2val[@type]:seq1 of char -> bool * [@type]
+seq_of_char2val(string) == is not yet specified;
+
+val2seq_of_char[@type] : @type +> seq of char
+val2seq_of_char(x) == is not yet specified;
+end VDMUtil
