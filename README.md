@@ -4,13 +4,13 @@ JSONUtil
 JSON parser/printer for VDM-SL
 
 JSON <-> VDM mappings
-    * JSON = seq of char;
-    * STRING = seq of char;
-    * ARRAY = seq of VALUE;
-    * OBJECT = map STRING to VALUE;
-    * NUMBER = real;
-    * BOOL = bool;
-    * VALUE = [ STRING | ARRAY | OBJECT | NUMBER | BOOL ];
+* JSON = seq of char;
+* STRING = seq of char;
+* ARRAY = seq of VALUE;
+* OBJECT = map STRING to VALUE;
+* NUMBER = real;
+* BOOL = bool;
+* VALUE = [ STRING | ARRAY | OBJECT | NUMBER | BOOL ];
 
 exports the following functions
 
