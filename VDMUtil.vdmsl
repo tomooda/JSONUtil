@@ -62,7 +62,7 @@ printValue(value) ==
     elseif is_(value, OBJECT) then
         printObject(value)
     else
-        "*** UNKNOWN ***";
+        undefined;
 
 printNumber : NUMBER -> JSON
 printNumber(number) == VDMUtil`val2seq_of_char[real](number);
