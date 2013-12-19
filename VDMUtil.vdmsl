@@ -31,13 +31,15 @@ parseJSON : JSON -> bool * VALUE
 parseJSON(json) == cases parseValue(json):
     mk_(value, rest) -> mk_(true, value),
     others -> mk_(false, nil)
-    end;
+    end
+post let mk_(success, value) = RESULT in not success => value = nil;
 
 strictParseJSON : JSON -> bool * VALUE
 strictParseJSON(json) == cases parseValue(json):
     mk_(value, rest) -> if trimBlanks(rest) = [] then mk_(true, value) else mk_(false, nil),
     others -> mk_(false, nil)
-    end;
+    end
+post let mk_(success, value) = RESULT in not success => value = nil;
 
     printJSON : VALUE -> JSON
     printJSON(value) == printValue(value);
