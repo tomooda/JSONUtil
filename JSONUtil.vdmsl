@@ -1,10 +1,38 @@
 module JSONUtil
+/***
+JSONUtil
+
+Author: Tomohiro Oda
+Version: 0.02
+License: the MIT License
+Caution: JSONUtil does not distinguish "" and []
+
+Copyright (c) 2013 Tomohiro Oda
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+***/
+
 imports from VDMUtil 
     functions
         seq_of_char2val[@type]:seq1 of char -> bool * [@type];
         val2seq_of_char[@T] : @T +> seq of char;
 exports
-    types JSON; STRING; ARRAY; OBJECT; NUMBER; BOOL;
+    types JSON; VALUE; STRING; ARRAY; OBJECT; NUMBER; BOOL;
     functions
         parseJSON : JSON -> bool * VALUE;
         strictParseJSON : JSON -> bool * VALUE;
@@ -29,7 +57,7 @@ FALSE = "false";
 functions
 parseJSON : JSON -> bool * VALUE
 parseJSON(json) == cases parseValue(json):
-    mk_(value, rest) -> mk_(true, value),
+    mk_(value, -) -> mk_(true, value),
     others -> mk_(false, nil)
     end
 post let mk_(success, value) = RESULT in not success => value = nil;
@@ -70,7 +98,7 @@ printNumber : NUMBER -> JSON
 printNumber(number) == VDMUtil`val2seq_of_char[real](number);
 
 printString : STRING -> JSON
-printString(string) == VDMUtil`val2seq_of_char[seq of char](string);
+printString(string) == if string = [] then ['\x22', '\x22'] else VDMUtil`val2seq_of_char[seq of char](string);
 
 printBool : BOOL -> JSON
 printBool(boolean) == if boolean then TRUE else FALSE;
@@ -250,7 +278,7 @@ parseString0(json) == cases json:
                 mk_(s, r) -> mk_([c]^s, r)
                 end
             end,
-    ['\\']^rest -> nil,
+    ['\\']^- -> nil,
     [c]^rest -> cases parseString0(rest):
         nil -> nil,
         mk_(s, r) -> mk_([c]^s, r)
@@ -346,9 +374,6 @@ string2real(string) == let mk_(-,c)=VDMUtil`seq_of_char2val[real](string) in c;
 
 measureJSON : JSON -> nat
 measureJSON(json) == len json;
-
-measureARRAY : ARRAY -> nat
-measureARRAY(array) == len array;
 
 end JSONUtil
 
