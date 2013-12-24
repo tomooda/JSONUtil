@@ -3,6 +3,8 @@ JSONUtil
 
 JSON parser/printer for VDM-SL
 
+*CAUTION* : JSONUtil does NOT distinguish "" and [] because neither does VDM-SL.
+
 ## JSON <-> VDM mappings
 
     JSON = seq of char;
