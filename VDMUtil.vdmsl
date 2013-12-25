@@ -1,0 +1,15 @@
+/***
+This is a simplified version of VDM's standard library.
+If you have the real one, it's recommended to use it rather than this one.
+***/
+
+module VDMUtil
+exports all
+definitions
+functions
+seq_of_char2val[@type]:seq1 of char -> bool * [@type]
+seq_of_char2val(string) == is not yet specified;
+
+val2seq_of_char[@type] : @type +> seq of char
+val2seq_of_char(x) == is not yet specified;
+end VDMUtil
